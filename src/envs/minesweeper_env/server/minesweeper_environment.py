@@ -14,22 +14,15 @@ import random
 from typing import Any, Dict, List, Optional, Set, Tuple
 from uuid import uuid4
 
+from openenv.core.env_server.interfaces import Environment
+from openenv.core.env_server.types import State
+
 from ..models import (
     MinesweeperAction,
     MinesweeperObservation,
     GameStatus,
     MinesweeperState,
 )
-
-# Support both in-repo and standalone imports
-try:
-    # In-repo imports (when running from OpenEnv repository)
-    from openenv.core.env_server.interfaces import Environment
-    from openenv.core.env_server.types import State
-except ImportError:
-    # Standalone imports (when environment is standalone with openenv from pip)
-    from openenv.core.env_server.interfaces import Environment
-    from openenv.core.env_server.types import State
 
 
 class MinesweeperEnvironment(Environment):
@@ -74,9 +67,6 @@ class MinesweeperEnvironment(Environment):
         self._flags_placed: Set[Tuple[int, int]] = set()
         self._mine_counts: List[List[int]] = [[0 for _ in range(width)] for _ in range(height)]
         self._game_status = GameStatus.ONGOING
-
-        # Auto-reset so the board is playable immediately
-        self.reset()
 
     def reset(self) -> MinesweeperObservation:
         """

@@ -6,27 +6,21 @@
 
 """Test suite for Minesweeper Environment."""
 
-import sys
 import os
-from pathlib import Path
+import signal
+import subprocess
+import sys
+import time
+import unittest
 
-# Add src to PYTHONPATH for proper imports
-ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-SRC_PATH = os.path.join(ROOT_DIR, "src")
-sys.path.insert(0, SRC_PATH)
-os.environ["PYTHONPATH"] = SRC_PATH
+import requests
 
 from envs.minesweeper_env import (
-    MinesweeperAction,
-    MinesweeperObservation,
     GameStatus,
+    MinesweeperAction,
     MinesweeperEnv,
+    MinesweeperObservation,
 )
-import subprocess
-import unittest
-import time
-import requests
-import signal
 
 
 class TestMinesweeperEnv(unittest.IsolatedAsyncioTestCase):

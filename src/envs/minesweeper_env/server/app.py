@@ -6,13 +6,7 @@
 
 """FastAPI application for the Minesweeper Environment."""
 
-# Support both in-repo and standalone imports
-try:
-    # In-repo imports (when running from OpenEnv repository)
-    from openenv.core.env_server import create_app
-except ImportError:
-    # Standalone imports (when environment is standalone with openenv from pip)
-    from openenv.core.env_server import create_app
+from openenv.core.env_server import create_app
 
 from ..models import MinesweeperAction, MinesweeperObservation
 from .minesweeper_environment import MinesweeperEnvironment

@@ -15,13 +15,7 @@ from enum import Enum
 from typing import List, Any, Set, Tuple
 from pydantic import Field, BaseModel
 
-# Support both in-repo and standalone imports
-try:
-    # In-repo imports (when running from OpenEnv repository)
-    from openenv.core.env_server.types import Action, Observation
-except ImportError:
-    # Standalone imports (when environment is standalone with openenv from pip)
-    from openenv.core.env_server.types import Action, Observation
+from openenv.core.env_server.types import Action, Observation
 
 
 class GameStatus(Enum):
