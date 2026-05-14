@@ -9,5 +9,9 @@
 from .client import MinesweeperEnv
 from .models import GameStatus, MinesweeperAction, MinesweeperObservation
 
-__all__ = ["GameStatus", "MinesweeperAction", "MinesweeperEnv", "MinesweeperObservation"]
-
+__all__ = [
+    "GameStatus",
+    "MinesweeperAction",
+    "MinesweeperEnv",
+    "MinesweeperObservation",
+]

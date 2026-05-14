@@ -9,4 +9,3 @@
 from .minesweeper_environment import MinesweeperEnvironment
 
 __all__ = ["MinesweeperEnvironment"]
-

@@ -12,14 +12,15 @@ to identify mines on a grid board.
 """
 
 from enum import Enum
-from typing import List, Any, Set, Tuple
-from pydantic import Field, BaseModel
+from typing import Any, List, Set, Tuple
 
 from openenv.core.env_server.types import Action, Observation
+from pydantic import BaseModel, Field
 
 
 class GameStatus(Enum):
     """Status of the Minesweeper game."""
+
     ONGOING = "ongoing"
     WON = "won"
     LOST = "lost"
@@ -34,9 +35,12 @@ class MinesweeperAction(Action):
         col: Column index of the cell to act on (0-indexed).
         action_type: Type of action - 'reveal' to uncover a cell, 'flag' to place/remove a flag.
     """
+
     row: int = Field(..., ge=0, description="Row index of the cell")
     col: int = Field(..., ge=0, description="Column index of the cell")
-    action_type: str = Field(..., pattern="^(reveal|flag)$", description="Type of action: 'reveal' or 'flag'")
+    action_type: str = Field(
+        ..., pattern="^(reveal|flag)$", description="Type of action: 'reveal' or 'flag'"
+    )
 
 
 class MinesweeperObservation(Observation):
@@ -56,6 +60,7 @@ class MinesweeperObservation(Observation):
         cells_revealed: Number of cells that have been revealed so far.
         game_status: Current status of the game - ongoing, won, or lost.
     """
+
     board: List[List[Any]] = Field(default_factory=list, description="2D board state")
     num_mines: int = Field(..., ge=0, description="Total number of mines")
     flags_placed: int = Field(..., ge=0, description="Number of flags placed")
@@ -90,6 +95,7 @@ class MinesweeperState(BaseModel):
         mine_counts: 2D list with counts of adjacent mines for each cell.
         game_status: Current status of the game - ongoing, won, or lost.
     """
+
     episode_id: str
     step_count: int
     board_height: int
@@ -113,11 +119,11 @@ class MinesweeperState(BaseModel):
             for c in range(self.board_width):
                 if (r, c) in self.revealed_cells:
                     if (r, c) in self.mine_locations:
-                        cell_value = '*'  # Revealed mine
+                        cell_value = "*"  # Revealed mine
                     else:
                         cell_value = self.mine_counts[r][c]  # Number of adjacent mines
                 elif (r, c) in self.flags:
-                    cell_value = 'F'  # Flagged cell
+                    cell_value = "F"  # Flagged cell
                 else:
                     cell_value = -1  # Unrevealed cell
                 row.append(cell_value)

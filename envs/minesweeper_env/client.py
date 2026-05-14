@@ -11,7 +11,7 @@ This module provides the client for connecting to a Minesweeper Environment serv
 via WebSocket for persistent sessions.
 """
 
-from typing import Any, Dict
+from typing import Dict
 
 from openenv.core.client_types import StepResult
 from openenv.core.env_client import EnvClient

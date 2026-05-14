@@ -14,13 +14,13 @@ import time
 import unittest
 
 import requests
-
 from envs.minesweeper_env import (
     GameStatus,
     MinesweeperAction,
     MinesweeperEnv,
     MinesweeperObservation,
 )
+from envs.minesweeper_env.server.minesweeper_environment import MinesweeperEnvironment
 
 
 class TestMinesweeperEnv(unittest.IsolatedAsyncioTestCase):
@@ -57,7 +57,11 @@ class TestMinesweeperEnv(unittest.IsolatedAsyncioTestCase):
             except subprocess.TimeoutExpired:
                 os.kill(cls.server_process.pid, signal.SIGKILL)
 
-            for stream in [cls.server_process.stdin, cls.server_process.stdout, cls.server_process.stderr]:
+            for stream in [
+                cls.server_process.stdin,
+                cls.server_process.stdout,
+                cls.server_process.stderr,
+            ]:
                 if stream and not stream.closed:
                     stream.close()
 
@@ -89,16 +93,19 @@ class TestMinesweeperEnv(unittest.IsolatedAsyncioTestCase):
             assert observation.flags_placed == 0
             assert observation.cells_revealed == 0
             # Compare with enum value (handles both int and enum)
-            assert observation.game_status == GameStatus.ONGOING.value or observation.game_status == GameStatus.ONGOING
+            assert (
+                observation.game_status == GameStatus.ONGOING.value
+                or observation.game_status == GameStatus.ONGOING
+            )
 
             # Check board structure (default 5x5)
             assert len(observation.board) == 5  # 5 rows
             assert all(len(row) == 5 for row in observation.board)  # 5 columns
 
             # Check all cells are initially unrevealed
-            assert all(
-                cell == -1 for row in observation.board for cell in row
-            ), "All cells should be unrevealed (-1) at start"
+            assert all(cell == -1 for row in observation.board for cell in row), (
+                "All cells should be unrevealed (-1) at start"
+            )
 
     async def test_reveal_action(self):
         """Test revealing a cell."""
@@ -111,7 +118,9 @@ class TestMinesweeperEnv(unittest.IsolatedAsyncioTestCase):
             observation = result.observation
 
             assert isinstance(observation, MinesweeperObservation)
-            assert observation.cells_revealed > 0, "At least one cell should be revealed"
+            assert observation.cells_revealed > 0, (
+                "At least one cell should be revealed"
+            )
 
     async def test_flag_action(self):
         """Test placing a flag."""
@@ -154,41 +163,50 @@ class TestMinesweeperEnv(unittest.IsolatedAsyncioTestCase):
             result = await client.step(action)
             observation = result.observation
 
-            assert observation.reward < 0, "Should receive negative reward for invalid action"
+            assert observation.reward < 0, (
+                "Should receive negative reward for invalid action"
+            )
 
             # Try invalid column
             action = MinesweeperAction(row=0, col=10, action_type="reveal")
             result = await client.step(action)
             observation = result.observation
 
-            assert observation.reward < 0, "Should receive negative reward for invalid action"
+            assert observation.reward < 0, (
+                "Should receive negative reward for invalid action"
+            )
 
     async def test_reveal_already_revealed(self):
         """Test revealing an already revealed cell."""
         async with MinesweeperEnv(base_url="http://127.0.0.1:8000") as client:
             await client.reset()
 
-            # Reveal a cell - try multiple cells to ensure one gets revealed
-            # (some cells might cascade reveal if they have 0 adjacent mines)
-            action = MinesweeperAction(row=2, col=2, action_type="reveal")
-            result = await client.step(action)
-            first_reward = result.observation.reward
-
-            # Make sure the cell was actually revealed (could be revealed by cascade)
-            # If it wasn't revealed successfully, try another cell
-            if result.observation.board[2][2] == -1:
-                action = MinesweeperAction(row=1, col=1, action_type="reveal")
+            # Find a safe revealed cell to re-target. Mines end the game, so
+            # we keep trying until we land on a non-mine revealed cell.
+            candidates = [(2, 2), (1, 1), (0, 0), (4, 4), (3, 3)]
+            test_row, test_col = None, None
+            for r, c in candidates:
+                action = MinesweeperAction(row=r, col=c, action_type="reveal")
                 result = await client.step(action)
-                test_row, test_col = 1, 1
-            else:
-                test_row, test_col = 2, 2
+                ongoing = (
+                    result.observation.game_status == GameStatus.ONGOING.value
+                    or result.observation.game_status == GameStatus.ONGOING
+                )
+                if ongoing and result.observation.board[r][c] != -1:
+                    test_row, test_col = r, c
+                    break
+                if not ongoing:
+                    await client.reset()
 
-            # Try revealing the same cell again
+            assert test_row is not None, "Could not reveal a safe cell across resets"
+
+            # Re-revealing the same cell should be penalised.
             action = MinesweeperAction(row=test_row, col=test_col, action_type="reveal")
             result = await client.step(action)
-            second_reward = result.observation.reward
-
-            assert second_reward < 0, f"Should receive penalty for revealing already revealed cell, got {second_reward}"
+            assert result.observation.reward < 0, (
+                f"Should receive penalty for revealing already revealed cell, "
+                f"got {result.observation.reward}"
+            )
 
     async def test_game_status_ongoing(self):
         """Test that game status remains ONGOING during normal play."""
@@ -201,8 +219,10 @@ class TestMinesweeperEnv(unittest.IsolatedAsyncioTestCase):
 
             # Game should still be ongoing if we didn't hit a mine or win
             # Handle both int and enum types for game_status
-            if (result.observation.game_status == GameStatus.ONGOING.value or
-                result.observation.game_status == GameStatus.ONGOING):
+            if (
+                result.observation.game_status == GameStatus.ONGOING.value
+                or result.observation.game_status == GameStatus.ONGOING
+            ):
                 assert result.observation.done is False
 
     async def test_board_cell_values(self):
@@ -222,7 +242,9 @@ class TestMinesweeperEnv(unittest.IsolatedAsyncioTestCase):
                         cell == -1  # Unrevealed
                         or cell == "F"  # Flagged
                         or cell == "*"  # Mine (if revealed)
-                        or (isinstance(cell, int) and 0 <= cell <= 8)  # Number of adjacent mines
+                        or (
+                            isinstance(cell, int) and 0 <= cell <= 8
+                        )  # Number of adjacent mines
                     ), f"Invalid cell value: {cell}"
 
     async def test_metadata_in_observation(self):
@@ -232,7 +254,9 @@ class TestMinesweeperEnv(unittest.IsolatedAsyncioTestCase):
             observation = result.observation
 
             assert hasattr(observation, "metadata"), "Observation should have metadata"
-            assert isinstance(observation.metadata, dict), "Metadata should be a dictionary"
+            assert isinstance(observation.metadata, dict), (
+                "Metadata should be a dictionary"
+            )
 
     async def test_multiple_steps(self):
         """Test taking multiple steps in the environment."""
@@ -263,10 +287,97 @@ class TestMinesweeperEnv(unittest.IsolatedAsyncioTestCase):
             observation = result.observation
 
             assert observation.flags_placed == 0, "Flags should be cleared after reset"
-            assert observation.cells_revealed == 0, "Revealed cells should be cleared after reset"
+            assert observation.cells_revealed == 0, (
+                "Revealed cells should be cleared after reset"
+            )
             # Compare with enum value (handles both int and enum)
-            assert (observation.game_status == GameStatus.ONGOING.value or
-                    observation.game_status == GameStatus.ONGOING), "Game should be ongoing after reset"
+            assert (
+                observation.game_status == GameStatus.ONGOING.value
+                or observation.game_status == GameStatus.ONGOING
+            ), "Game should be ongoing after reset"
+
+
+class TestMinesweeperEnvironmentLogic(unittest.TestCase):
+    """Direct unit tests against MinesweeperEnvironment (no HTTP server)."""
+
+    def test_hitting_last_mine_does_not_overwrite_lost_with_won(self):
+        """Revealing a mine must not be reclassified as a win, even if the
+        revealed-cell count happens to equal total_cells - num_mines."""
+        # 2x2 with 2 mines: safe = 2, mines = 2.
+        # Pre-reveal 1 safe cell. Then reveal a mine — _revealed_cells grows
+        # to 2, which equals total(4) - mines(2). The buggy check used to
+        # count the mine and overwrite LOST with WON.
+        env = MinesweeperEnvironment(height=2, width=2, num_mines=2)
+        env.reset()
+
+        env._mine_positions = {(0, 1), (1, 1)}
+        env._compute_mine_counts()
+        env._revealed_cells = {(0, 0)}
+        env._flags_placed = set()
+        env._game_status = GameStatus.ONGOING
+
+        obs = env.step(MinesweeperAction(row=0, col=1, action_type="reveal"))
+
+        assert env._game_status == GameStatus.LOST, (
+            f"Game must be LOST after revealing a mine, got {env._game_status}"
+        )
+        assert obs.game_status == GameStatus.LOST
+        assert obs.done is True
+        assert obs.reward == -10.0
+
+    def test_revealing_last_safe_cell_wins(self):
+        """The normal win path still works after the LOST guard."""
+        env = MinesweeperEnvironment(height=2, width=2, num_mines=1)
+        env.reset()
+
+        env._mine_positions = {(1, 1)}
+        env._compute_mine_counts()
+        env._revealed_cells = {(0, 0), (0, 1)}
+        env._flags_placed = set()
+        env._game_status = GameStatus.ONGOING
+
+        obs = env.step(MinesweeperAction(row=1, col=0, action_type="reveal"))
+
+        assert env._game_status == GameStatus.WON
+        assert obs.game_status == GameStatus.WON
+        assert obs.done is True
+
+    def test_revealing_flagged_cell_returns_error_metadata(self):
+        """A reject reason for a no-op action is surfaced in metadata.error."""
+        env = MinesweeperEnvironment(height=3, width=3, num_mines=1)
+        env.reset()
+
+        env._mine_positions = {(2, 2)}
+        env._compute_mine_counts()
+        env._revealed_cells = set()
+        env._flags_placed = {(0, 0)}
+        env._game_status = GameStatus.ONGOING
+
+        obs = env.step(MinesweeperAction(row=0, col=0, action_type="reveal"))
+
+        assert obs.reward == -0.05
+        assert obs.metadata.get("error"), (
+            "Expected metadata.error explaining the rejection"
+        )
+        assert "flag" in obs.metadata["error"].lower()
+
+    def test_flagging_revealed_cell_returns_error_metadata(self):
+        """Flagging an already-revealed cell is rejected with an error message."""
+        env = MinesweeperEnvironment(height=3, width=3, num_mines=1)
+        env.reset()
+
+        env._mine_positions = {(2, 2)}
+        env._compute_mine_counts()
+        env._revealed_cells = {(0, 0)}
+        env._flags_placed = set()
+        env._game_status = GameStatus.ONGOING
+
+        obs = env.step(MinesweeperAction(row=0, col=0, action_type="flag"))
+
+        assert obs.reward == -0.05
+        assert obs.metadata.get("error"), (
+            "Expected metadata.error explaining the rejection"
+        )
 
 
 if __name__ == "__main__":

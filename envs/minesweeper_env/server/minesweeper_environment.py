@@ -10,6 +10,7 @@ Minesweeper Environment Implementation.
 A Minesweeper game environment where agents must reveal cells and place flags
 to identify mines on a grid board without triggering any mines.
 """
+
 import random
 from typing import Any, Dict, List, Optional, Set, Tuple
 from uuid import uuid4
@@ -18,14 +19,16 @@ from openenv.core.env_server.interfaces import Environment
 from openenv.core.env_server.types import State
 
 from ..models import (
+    GameStatus,
     MinesweeperAction,
     MinesweeperObservation,
-    GameStatus,
     MinesweeperState,
 )
 
 
-class MinesweeperEnvironment(Environment):
+class MinesweeperEnvironment(
+    Environment[MinesweeperAction, MinesweeperObservation, State]
+):
     """
     Minesweeper game environment implementation for Reinforcement Learning.
     The environment consists of a grid with hidden mines. The agent can reveal cells or place flags.
@@ -40,7 +43,7 @@ class MinesweeperEnvironment(Environment):
         0-8: number of adjacent mines (if revealed)
         'F': flagged cell
         '*': mine (only revealed if game is lost)
-    
+
     Example:
         >>> env = MinesweeperEnvironment(height=5, width=5, num_mines=5)
         >>> obs = env.reset()
@@ -54,6 +57,7 @@ class MinesweeperEnvironment(Environment):
             width: Width of the minesweeper board.
             num_mines: Number of mines to place on the board.
         """
+        super().__init__()
         self.height = height
         self.width = width
         self.num_mines = num_mines
@@ -65,7 +69,9 @@ class MinesweeperEnvironment(Environment):
         self._mine_positions: Set[Tuple[int, int]] = set()
         self._revealed_cells: Set[Tuple[int, int]] = set()
         self._flags_placed: Set[Tuple[int, int]] = set()
-        self._mine_counts: List[List[int]] = [[0 for _ in range(width)] for _ in range(height)]
+        self._mine_counts: List[List[int]] = [
+            [0 for _ in range(width)] for _ in range(height)
+        ]
         self._game_status = GameStatus.ONGOING
 
     def reset(self) -> MinesweeperObservation:
@@ -126,21 +132,25 @@ class MinesweeperEnvironment(Environment):
             )
 
         reward = 0.0
+        error: Optional[str] = None
 
         if action.action_type == "reveal":
-            reward = self._reveal_cell(row, col)
+            reward, error = self._reveal_cell(row, col)
         elif action.action_type == "flag":
-            reward = self._toggle_flag(row, col)
+            reward, error = self._toggle_flag(row, col)
         else:
-            reward = -0.1  # Invalid action type
-        
+            reward = -0.1
+            error = f"Unknown action_type: {action.action_type!r}"
+
         self._check_win_condition()
 
+        metadata = {"error": error} if error else None
         return self._create_observation(
             done=self._game_status != GameStatus.ONGOING,
             reward=reward,
+            metadata=metadata,
         )
-    
+
     def _place_mines(self) -> None:
         """Randomly place mines on the board."""
         self._mine_positions.clear()
@@ -148,7 +158,7 @@ class MinesweeperEnvironment(Environment):
             r = random.randint(0, self.height - 1)
             c = random.randint(0, self.width - 1)
             self._mine_positions.add((r, c))
-    
+
     def _compute_mine_counts(self) -> None:
         """Compute the number of adjacent mines for each cell."""
         self._mine_counts = [[0 for _ in range(self.width)] for _ in range(self.height)]
@@ -157,7 +167,7 @@ class MinesweeperEnvironment(Environment):
                 if (row, col) not in self._mine_positions:
                     count = self._count_adjacent_mines(row, col)
                     self._mine_counts[row][col] = count
-    
+
     def _count_adjacent_mines(self, row: int, col: int) -> int:
         """Count the number of mines adjacent to the given cell."""
         count = 0
@@ -169,21 +179,26 @@ class MinesweeperEnvironment(Environment):
                 if self._is_valid_position(r, c) and (r, c) in self._mine_positions:
                     count += 1
         return count
-    
-    def _reveal_cell(self, row: int, col: int) -> float:
-        """Reveal the cell at (row, col). Returns the reward for the action."""
-        if (row, col) in self._revealed_cells or (row, col) in self._flags_placed:
-            return -0.05  # Penalty for revealing already revealed or flagged cell
+
+    def _reveal_cell(self, row: int, col: int) -> Tuple[float, Optional[str]]:
+        """Reveal the cell at (row, col).
+
+        Returns:
+            (reward, error). ``error`` is a human-readable reason the action was
+            a no-op (e.g. cell already revealed / flagged) or ``None``.
+        """
+        if (row, col) in self._revealed_cells:
+            return -0.05, f"Cell ({row}, {col}) is already revealed"
+        if (row, col) in self._flags_placed:
+            return -0.05, f"Cell ({row}, {col}) is flagged; remove the flag first"
 
         if (row, col) in self._mine_positions:
             self._game_status = GameStatus.LOST
             self._revealed_cells.add((row, col))
-            return -10.0  # Penalty for hitting a mine
+            return -10.0, None
 
-        # Reveal the cell and potentially adjacent cells if count is 0
         self._reveal_recursive(row, col)
-
-        return 1.0  # Small reward for safe reveal
+        return 1.0, None
 
     def _reveal_recursive(self, row: int, col: int) -> None:
         """Recursively reveal cells with 0 adjacent mines."""
@@ -203,32 +218,43 @@ class MinesweeperEnvironment(Environment):
                     if dr == 0 and dc == 0:
                         continue
                     self._reveal_recursive(row + dr, col + dc)
-    
-    def _toggle_flag(self, row: int, col: int) -> float:
-        """Toggle a flag on the cell at (row, col). Returns the reward for the action."""
+
+    def _toggle_flag(self, row: int, col: int) -> Tuple[float, Optional[str]]:
+        """Toggle a flag on the cell at (row, col).
+
+        Returns:
+            (reward, error). ``error`` is set when the action is rejected
+            (e.g. trying to flag a revealed cell).
+        """
         if (row, col) in self._revealed_cells:
-            return -0.05  # Penalty for flagging a revealed cell
+            return -0.05, f"Cannot flag revealed cell ({row}, {col})"
 
         if (row, col) in self._flags_placed:
             self._flags_placed.remove((row, col))
-            return 0.0  # No penalty for removing a flag
-        else:
-            self._flags_placed.add((row, col))
-            if (row, col) in self._mine_positions:
-                return 0.5  # Small reward for correctly flagging a mine
-            return 0.0  # No reward for flagging a non-mine cell  
-    
+            return 0.0, None
+
+        self._flags_placed.add((row, col))
+        if (row, col) in self._mine_positions:
+            return 0.5, None
+        return 0.0, None
+
     def _check_win_condition(self) -> None:
-        """Check if the game has been won."""
-        total_cells = self.height * self.width
-        revealed_count = len(self._revealed_cells)
-        if revealed_count == total_cells - self.num_mines:
+        """Check if the game has been won.
+
+        Only counts non-mine cells: hitting a mine adds it to ``_revealed_cells``
+        but must never satisfy the win threshold (which would otherwise overwrite
+        a freshly-set LOST status on a near-complete board).
+        """
+        if self._game_status != GameStatus.ONGOING:
+            return
+        safe_revealed = len(self._revealed_cells - self._mine_positions)
+        if safe_revealed == self.height * self.width - self.num_mines:
             self._game_status = GameStatus.WON
-    
+
     def _is_valid_position(self, row: int, col: int) -> bool:
         """Check if the given (row, col) is within board bounds."""
         return 0 <= row < self.height and 0 <= col < self.width
-    
+
     def _create_observation(
         self,
         done: bool,
@@ -249,11 +275,11 @@ class MinesweeperEnvironment(Environment):
             for c in range(self.width):
                 if (r, c) in self._revealed_cells:
                     if (r, c) in self._mine_positions:
-                        row.append('*')
+                        row.append("*")
                     else:
                         row.append(self._mine_counts[r][c])
                 elif (r, c) in self._flags_placed:
-                    row.append('F')
+                    row.append("F")
                 else:
                     row.append(-1)
             board.append(row)
@@ -300,7 +326,7 @@ class MinesweeperEnvironment(Environment):
             mine_counts=self._mine_counts,
             game_status=self._game_status,
         )
-    
+
     def get_legal_actions(self) -> List[MinesweeperAction]:
         """
         Get the list of legal actions available in the current state.
@@ -316,8 +342,15 @@ class MinesweeperEnvironment(Environment):
 
         for r in range(self.height):
             for c in range(self.width):
-                if (r, c) not in self._revealed_cells and (r, c) not in self._flags_placed:
-                    legal_actions.append(MinesweeperAction(row=r, col=c, action_type="reveal"))
+                if (r, c) not in self._revealed_cells and (
+                    r,
+                    c,
+                ) not in self._flags_placed:
+                    legal_actions.append(
+                        MinesweeperAction(row=r, col=c, action_type="reveal")
+                    )
                 if (r, c) not in self._revealed_cells:
-                    legal_actions.append(MinesweeperAction(row=r, col=c, action_type="flag"))
+                    legal_actions.append(
+                        MinesweeperAction(row=r, col=c, action_type="flag")
+                    )
         return legal_actions
