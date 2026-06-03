@@ -49,7 +49,7 @@
   - local: tutorials/evaluation-inspect
     title: Evaluating with Inspect AI
   - local: tutorials/browsergym-harness
-    title: BrowserGym Harness
+    title: RL Training with an Agentic Harness
   - local: tutorials/sft-warmup
     title: SFT Training with Environments
   title: Tutorials
@@ -137,9 +137,9 @@
   title: API Reference
 - sections:
   - local: contributing
-    title: Contributing
-  - local: getting_started/contributing-envs
     title: Contributing To OpenEnv
+  - local: getting_started/contributing-envs
+    title: Contributing Environments
   - local: release-notes
     title: Release Notes
   title: Project
