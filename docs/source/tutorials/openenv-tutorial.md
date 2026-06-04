@@ -1238,6 +1238,8 @@ OpenEnv includes 3 complete examples:
 - ⚡ Unsloth
 - 🌟 Reflection
 - 🔥 Meta PyTorch
+- ☁️ Modal
+- 🧠 Prime Intellect
 
 **Supported by amazing organizations and contributors.**
 
