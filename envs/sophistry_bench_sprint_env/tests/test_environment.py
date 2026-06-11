@@ -17,3 +17,32 @@ def test_advocacy_observation_defaults():
     assert o.reward == 0.0
     assert o.done is False
     assert o.metadata == {}
+
+
+def test_client_parses_step_result():
+    from sophistry_bench_sprint_env.client import SophistryBenchSprintEnv
+    from sophistry_bench_sprint_env.models import AdvocacyAction, AdvocacyObservation
+
+    # Exercise the pure parsing hooks without a live server.
+    client = SophistryBenchSprintEnv.__new__(SophistryBenchSprintEnv)
+    payload = client._step_payload(AdvocacyAction(text="<claim>x</claim>"))
+    assert payload["text"] == "<claim>x</claim>"
+
+    raw = {
+        "observation": {
+            "prompt": "",
+            "answer_to_defend": "",
+            "item_id": "",
+            "reward": 0.5,
+            "done": True,
+            "metadata": {"aggregate_reward": 0.5},
+        },
+        "reward": 0.5,
+        "done": True,
+        "info": {},
+    }
+    result = client._parse_result(raw)
+    assert isinstance(result.observation, AdvocacyObservation)
+    assert result.observation.metadata["aggregate_reward"] == 0.5
+    assert result.reward == 0.5
+    assert result.done is True
