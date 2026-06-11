@@ -77,3 +77,65 @@ def test_reset_is_deterministic_for_fixed_seed():
         b.answer_to_defend,
         b.prompt,
     )
+
+
+import asyncio
+
+from sophistry_bench_sprint import load_environment
+from sophistry_bench_sprint_env.models import AdvocacyAction
+
+_METADATA_KEYS = {
+    "aggregate_reward",
+    "correctness_reward",
+    "n_claims",
+    "n_citations",
+    "alternation_canary",
+    "starts_with_canary",
+    "length_band_canary",
+    "template_echo_canary",
+}
+
+
+def test_step_returns_all_components_and_is_done():
+    env = _env()
+    env.reset(seed=0)
+    text = "".join(f"<claim>point {i}</claim>" for i in range(8))  # 8 claims, 0 cites
+    obs = env.step(AdvocacyAction(text=text))
+    assert obs.done is True
+    assert set(obs.metadata.keys()) == _METADATA_KEYS
+    assert obs.metadata["n_claims"] == 8.0
+    assert obs.metadata["n_citations"] == 0.0
+    # claim_count_cliff(8)=1.0, citation_grounding(claims, [], passage)=0.0 -> mean 0.5
+    assert obs.metadata["aggregate_reward"] == 0.5
+    # default weights -> reward == aggregate
+    assert obs.reward == 0.5
+
+
+def test_step_before_reset_errors_gracefully():
+    env = _env()
+    obs = env.step(AdvocacyAction(text="<claim>x</claim>"))
+    assert obs.done is True
+    assert obs.reward == 0.0
+    assert "error" in obs.metadata
+
+
+def test_aggregate_matches_canonical_verifiers_reward():
+    """Anti-drift: OpenEnv aggregate must equal the PI Hub aggregate_reward."""
+    env = _env()
+    env.reset(seed=0)
+    text = "<claim>alpha</claim><cite>beta gamma delta epsilon zeta</cite>"
+    obs = env.step(AdvocacyAction(text=text))
+
+    vf_env = load_environment(n_items=2, passage_chars=500, seed=0)
+    # Newer verifiers wrap the reward Rubric in a RubricGroup, so funcs live on
+    # the inner rubric; older versions expose them directly. aggregate_reward is index 0.
+    rubric = vf_env.rubric
+    if not getattr(rubric, "funcs", None) and getattr(rubric, "rubrics", None):
+        rubric = rubric.rubrics[0]
+    aggregate_fn = rubric.funcs[0]  # aggregate_reward is index 0
+    completion = [{"role": "assistant", "content": text}]
+    state = {"info": {"passage": env._current_passage}}
+    canonical = asyncio.run(
+        aggregate_fn(prompt=[], completion=completion, answer="", state=state)
+    )
+    assert abs(obs.metadata["aggregate_reward"] - canonical) < 1e-9

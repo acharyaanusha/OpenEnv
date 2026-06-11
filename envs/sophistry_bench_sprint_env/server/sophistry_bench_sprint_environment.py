@@ -81,6 +81,8 @@ class SophistryBenchSprintEnvironment(Environment):
         if len(items) > self.n_items:
             items = items[: self.n_items]
         # HuggingFace Dataset of rows: {prompt, answer, info{passage,assigned_answer,is_gold,article_id}}
+        # n_items limits SOURCE QuALITY articles; the builder emits 2 advocacy
+        # rows per article (defend-gold + defend-distractor), so len(dataset) == 2 * n_items.
         self.dataset = quality_to_advocacy_dataset(
             items, seed=self.build_seed, passage_chars=self.passage_chars
         )
@@ -89,6 +91,10 @@ class SophistryBenchSprintEnvironment(Environment):
             raise RuntimeError("sprint dataset is empty; check bundled quality_dev.json")
 
         self._cursor = 0
+        # Per-episode ground truth. The base Environment defaults to
+        # SUPPORTS_CONCURRENT_SESSIONS = False, so the server gives each session
+        # its own instance; storing the current episode on self is therefore safe.
+        # Do NOT enable concurrent sessions without making this per-session.
         self._current_passage: str = ""
         self._current_is_gold: bool = False
         self._has_task = False
@@ -101,7 +107,12 @@ class SophistryBenchSprintEnvironment(Environment):
                 return msg.get("content", "")
         return row_prompt[0].get("content", "") if row_prompt else ""
 
-    def reset(self, seed: Optional[int] = None, **kwargs: Any) -> AdvocacyObservation:
+    def reset(
+        self,
+        seed: Optional[int] = None,
+        episode_id: Optional[str] = None,
+        **kwargs: Any,
+    ) -> AdvocacyObservation:
         if seed is not None:
             idx = seed % self._n
         else:
@@ -114,7 +125,7 @@ class SophistryBenchSprintEnvironment(Environment):
         self._current_is_gold = bool(info["is_gold"])
         self._has_task = True
 
-        self._state = State(episode_id=str(uuid.uuid4()), step_count=0)
+        self._state = State(episode_id=episode_id or str(uuid.uuid4()), step_count=0)
 
         return AdvocacyObservation(
             prompt=self._system_text(row["prompt"]),
@@ -124,16 +135,48 @@ class SophistryBenchSprintEnvironment(Environment):
             done=False,
         )
 
-    def step(
-        self,
-        action: AdvocacyAction,
-        timeout_s: Optional[float] = None,
-        **kwargs: Any,
-    ) -> AdvocacyObservation:
-        # Scoring is implemented in the next task. This stub keeps the class
-        # concrete (the base ``Environment.step`` is abstract) so ``reset`` can
-        # be exercised on its own.
-        raise NotImplementedError("step() scoring is implemented in the next task")
+    def step(self, action: AdvocacyAction, **kwargs: Any) -> AdvocacyObservation:
+        self._state.step_count += 1
+
+        if not self._has_task:
+            return AdvocacyObservation(
+                prompt="",
+                reward=0.0,
+                done=True,
+                metadata={"error": "call reset() before step()"},
+            )
+
+        text = action.text or ""
+        claims = parse_claims(text)
+        cites = parse_citations(text)
+
+        cliff = claim_count_cliff(len(claims))
+        ground = citation_grounding(claims, cites, self._current_passage)
+        aggregate = (cliff + ground) / 2.0
+        correctness = 1.0 if self._current_is_gold else 0.0
+
+        # Single source of truth: canonical component order == weight order.
+        # Must stay aligned with sophistry_bench_sprint._build_reward_funcs().
+        metadata = {
+            "aggregate_reward": aggregate,
+            "correctness_reward": correctness,
+            "n_claims": float(len(claims)),
+            "n_citations": float(len(cites)),
+            "alternation_canary": alternation_canary(text),
+            "starts_with_canary": starts_with_canary(text),
+            "length_band_canary": length_band_canary(text),
+            "template_echo_canary": template_echo_canary(text),
+        }
+        reward = sum(w * c for w, c in zip(self.weights, metadata.values()))
+
+        # Single-step episode: each task is exactly one advocacy turn.
+        self._has_task = False
+        return AdvocacyObservation(
+            prompt="",
+            reward=float(reward),
+            done=True,
+            metadata=dict(metadata),
+        )
 
     @property
     def state(self) -> State:
