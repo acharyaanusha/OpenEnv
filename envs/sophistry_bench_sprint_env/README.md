@@ -1,3 +1,15 @@
+---
+title: Sophistry Bench Sprint Env
+emoji: 🗣️
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+pinned: false
+app_port: 8000
+tags:
+  - openenv
+---
+
 # sophistry_bench_sprint_env
 
 OpenEnv port of the [sophistry-bench](https://github.com/acharyaanusha/sophistry-bench)
@@ -6,8 +18,8 @@ reading-comprehension passages: the policy is assigned the gold answer or a dist
 produce one `<claim>`/`<cite>` argument. The reward proxy peaks at exactly 8 `<claim>` tags
 (`claim_count_cliff`); four weight-0 canaries detect format hacking.
 
-Scoring is imported verbatim from the `sophistry-bench-sprint` package (vendored wheel), so the
-reward numbers are identical to the Prime Intellect Hub env.
+Scoring is imported verbatim from the [`sophistry-bench-sprint`](https://pypi.org/project/sophistry-bench-sprint/)
+PyPI package, so the reward numbers are identical to the Prime Intellect Hub env.
 
 ## Episode model
 
@@ -28,7 +40,9 @@ Single step. `reset()` issues a task; `step(AdvocacyAction(text=...))` scores it
 ```python
 from envs.sophistry_bench_sprint_env import SophistryBenchSprintEnv
 
-env = SophistryBenchSprintEnv.from_docker_image("openenv-sophistry_bench_sprint:latest")
+# Run the deployed Hugging Face Space:
+env = SophistryBenchSprintEnv.from_env("anushaacharya/sophistry_bench_sprint_env")
+# ...or a local image: SophistryBenchSprintEnv.from_docker_image("openenv-sophistry_bench_sprint:latest")
 try:
     obs = env.reset().observation
     print(obs.prompt, obs.answer_to_defend)
