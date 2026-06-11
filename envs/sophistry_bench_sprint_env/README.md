@@ -28,7 +28,7 @@ Single step. `reset()` issues a task; `step(AdvocacyAction(text=...))` scores it
 ```python
 from envs.sophistry_bench_sprint_env import SophistryBenchSprintEnv
 
-env = SophistryBenchSprintEnv.from_docker_image("sophistry-bench-sprint-env:latest")
+env = SophistryBenchSprintEnv.from_docker_image("openenv-sophistry_bench_sprint:latest")
 try:
     obs = env.reset().observation
     print(obs.prompt, obs.answer_to_defend)
@@ -49,4 +49,5 @@ cd envs/sophistry_bench_sprint_env && uv sync --extra dev && uv run pytest tests
 
 # Container
 openenv build sophistry_bench_sprint_env
+# produces image tag: openenv-sophistry_bench_sprint:latest
 ```

@@ -172,3 +172,29 @@ def test_metadata_survives_wire_serialization_round_trip():
     result = client._parse_result(wire)
     assert set(result.observation.metadata.keys()) == _METADATA_KEYS
     assert result.reward == obs.reward
+
+
+def test_error_survives_wire_serialization_round_trip():
+    """The error path declares an ``error`` field so the step-before-reset
+    message survives the framework's metadata-stripping serialization and is
+    restored into ``metadata`` by the typed client on the way back."""
+    from openenv.core.env_server.serialization import serialize_observation
+    from sophistry_bench_sprint_env.client import SophistryBenchSprintEnv
+
+    env = _env()
+    obs = env.step(AdvocacyAction(text="<claim>x</claim>"))  # step before reset
+
+    payload = serialize_observation(obs)
+    obs_dict = payload["observation"]
+    assert "metadata" not in obs_dict  # framework strips base metadata
+    assert obs_dict["error"] == "call reset() before step()"
+
+    wire = {
+        "observation": obs_dict,
+        "reward": payload["reward"],
+        "done": payload["done"],
+    }
+    client = SophistryBenchSprintEnv.__new__(SophistryBenchSprintEnv)
+    result = client._parse_result(wire)
+    assert result.observation.metadata["error"] == "call reset() before step()"
+    assert result.reward == 0.0
