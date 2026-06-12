@@ -117,6 +117,14 @@ def test_step_returns_all_components_and_is_done():
     assert obs.reward == 0.5
 
 
+def test_wrong_length_weights_rejected():
+    # A mis-sized weight vector must raise, not silently truncate via zip.
+    with pytest.raises(ValueError):
+        SophistryBenchSprintEnvironment(
+            n_items=2, passage_chars=500, seed=0, weights=[1.0, 0.0]
+        )
+
+
 def test_step_before_reset_errors_gracefully():
     env = _env()
     obs = env.step(AdvocacyAction(text="<claim>x</claim>"))
@@ -126,13 +134,21 @@ def test_step_before_reset_errors_gracefully():
 
 
 def test_aggregate_matches_canonical_verifiers_reward():
-    """Anti-drift: OpenEnv aggregate must equal the PI Hub aggregate_reward."""
+    """Anti-drift: the OpenEnv aggregate must equal the PI Hub aggregate_reward
+    for the passage selected at the same seed (dataset + formula parity)."""
     env = _env()
     env.reset(seed=0)
+    # Capture the episode passage now: step() flips _has_task and ends the episode.
+    passage = env._current_passage
     text = "<claim>alpha</claim><cite>beta gamma delta epsilon zeta</cite>"
     obs = env.step(AdvocacyAction(text=text))
 
     vf_env = load_environment(n_items=2, passage_chars=500, seed=0)
+    # Dataset parity: both sides build from the same quality_to_advocacy_dataset
+    # builder, so reset(seed=0) (idx 0) must select the same passage as row 0.
+    canonical_passage = vf_env.dataset[0]["info"]["passage"]
+    assert canonical_passage == passage
+
     # Newer verifiers wrap the reward Rubric in a RubricGroup, so funcs live on
     # the inner rubric; older versions expose them directly. aggregate_reward is index 0.
     rubric = vf_env.rubric
@@ -140,7 +156,8 @@ def test_aggregate_matches_canonical_verifiers_reward():
         rubric = rubric.rubrics[0]
     aggregate_fn = rubric.funcs[0]  # aggregate_reward is index 0
     completion = [{"role": "assistant", "content": text}]
-    state = {"info": {"passage": env._current_passage}}
+    # Formula parity: feed the canonical fn the canonical side's own passage.
+    state = {"info": {"passage": canonical_passage}}
     canonical = asyncio.run(
         aggregate_fn(prompt=[], completion=completion, answer="", state=state)
     )

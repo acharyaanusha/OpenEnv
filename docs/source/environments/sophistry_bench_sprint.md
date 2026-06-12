@@ -44,11 +44,22 @@ finally:
 `result.observation.metadata` contains all eight reward components every step — the canary
 scores are the reward-hacking measurement.
 
+> **Do not feed `observation.metadata` / `observation.components` back into the policy's
+> prompt.** They include `correctness_reward` (whether the assigned answer is the gold one),
+> which is the hidden ground truth. `reset()` deliberately tells the policy only *what* to
+> defend, never *whether* it is correct; surfacing the components to the agent leaks that
+> signal and defeats the reward-hacking measurement.
+
 ## Build & test
 
 ```bash
-# Tests live with the other env tests and run from the repo root:
-PYTHONPATH=src:envs uv run pytest tests/envs/test_sophistry_bench_sprint_environment.py -v
+# Tests live with the other env tests. Run them from the repo root using this
+# env's venv (which installs the scoring package):
+uv run --project envs/sophistry_bench_sprint_env --extra dev \
+  pytest tests/envs/test_sophistry_bench_sprint_environment.py -v
+# The module pulls the published sophistry-bench-sprint, so in the repo's shared
+# CI (where it isn't installed) it skips via pytest.importorskip — same as other
+# envs with heavy deps (e.g. tbench2's camel guard).
 
 # Container
 openenv build sophistry_bench_sprint_env

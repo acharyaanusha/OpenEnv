@@ -37,6 +37,20 @@ except ImportError:  # when imported as top-level package
     from sophistry_bench_sprint_env.models import AdvocacyAction, AdvocacyObservation
 
 
+# Canonical reward-component order. The i-th SPRINT_WEIGHTS entry weights the
+# i-th key here. MUST stay aligned with sophistry_bench_sprint._build_reward_funcs()
+# and with the SPRINT_WEIGHTS docs in the README.
+_COMPONENT_KEYS = (
+    "aggregate_reward",
+    "correctness_reward",
+    "n_claims",
+    "n_citations",
+    "alternation_canary",
+    "starts_with_canary",
+    "length_band_canary",
+    "template_echo_canary",
+)
+
 _DEFAULT_WEIGHTS = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
 
@@ -82,6 +96,14 @@ class SophistryBenchSprintEnvironment(
             seed if seed is not None else int(os.getenv("SPRINT_SEED", "0"))
         )
         self.weights = weights if weights is not None else _weights_from_env()
+        # Guard the constructor ``weights=`` path too (the env-var path is already
+        # length-checked). A wrong-length vector would otherwise be silently
+        # truncated by the ``zip`` in ``step``, scrambling the reward with no error.
+        if len(self.weights) != len(_COMPONENT_KEYS):
+            raise ValueError(
+                f"weights must have {len(_COMPONENT_KEYS)} values, "
+                f"got {len(self.weights)}"
+            )
 
         items = load_quality_from_json(packaged_quality_path())
         if len(items) > self.n_items:
@@ -144,8 +166,6 @@ class SophistryBenchSprintEnvironment(
         )
 
     def step(self, action: AdvocacyAction, **kwargs: Any) -> AdvocacyObservation:
-        self._state.step_count += 1
-
         if not self._has_task:
             msg = "call reset() before step()"
             return AdvocacyObservation(
@@ -155,6 +175,9 @@ class SophistryBenchSprintEnvironment(
                 error=msg,
                 metadata={"error": msg},
             )
+
+        # Count only scored steps (after the reset guard).
+        self._state.step_count += 1
 
         text = action.text or ""
         claims = parse_claims(text)
@@ -170,8 +193,6 @@ class SophistryBenchSprintEnvironment(
         aggregate = (cliff + ground) / 2.0
         correctness = 1.0 if self._current_is_gold else 0.0
 
-        # Single source of truth: canonical component order == weight order.
-        # Must stay aligned with sophistry_bench_sprint._build_reward_funcs().
         metadata = {
             "aggregate_reward": aggregate,
             "correctness_reward": correctness,
@@ -182,7 +203,12 @@ class SophistryBenchSprintEnvironment(
             "length_band_canary": length_band_canary(text),
             "template_echo_canary": template_echo_canary(text),
         }
-        reward = sum(w * c for w, c in zip(self.weights, metadata.values()))
+        # Weight by explicit key (not dict order) so a future reorder of the dict
+        # above can't silently scramble the weight<->component mapping. strict=True
+        # backstops the length invariant enforced in __init__.
+        reward = sum(
+            w * metadata[k] for w, k in zip(self.weights, _COMPONENT_KEYS, strict=True)
+        )
 
         # Single-step episode: each task is exactly one advocacy turn.
         self._has_task = False

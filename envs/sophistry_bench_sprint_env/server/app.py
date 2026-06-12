@@ -13,7 +13,11 @@ try:
     from ..models import AdvocacyAction, AdvocacyObservation
     from .sophistry_bench_sprint_environment import SophistryBenchSprintEnvironment
 except ImportError:
-    # Container runtime context (uvicorn server.app:app, PYTHONPATH=/app/env)
+    # Container runtime context (uvicorn server.app:app, PYTHONPATH=/app/env).
+    # This branch resolves only because the wheel installs the package under the
+    # name ``sophistry_bench_sprint_env`` via the load-bearing ``package-dir``
+    # remap in pyproject.toml (source lives at the env-dir root, not a subdir).
+    # If that remap is changed, container startup breaks here with a ModuleNotFound.
     from sophistry_bench_sprint_env.models import AdvocacyAction, AdvocacyObservation
     from sophistry_bench_sprint_env.server.sophistry_bench_sprint_environment import (
         SophistryBenchSprintEnvironment,
