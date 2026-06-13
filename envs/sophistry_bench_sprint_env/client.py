@@ -29,9 +29,15 @@ class SophistryBenchSprintEnv(EnvClient[AdvocacyAction, AdvocacyObservation, Sta
         return action.model_dump()
 
     def _parse_result(self, data: dict) -> StepResult[AdvocacyObservation]:
-        # Defensive .get (matches the CLI template) so a malformed response gives
-        # an empty observation rather than a bare KeyError.
-        obs_data = dict(data.get("observation") or {})
+        # Fail loudly on a malformed payload rather than silently building an
+        # empty observation (a missing/null ``observation`` is a real protocol error).
+        observation_payload = data.get("observation")
+        if not isinstance(observation_payload, dict):
+            raise ValueError(
+                "malformed step result: 'observation' must be a dict, got "
+                f"{type(observation_payload).__name__}"
+            )
+        obs_data = dict(observation_payload)
         # The framework's HTTP layer strips the base ``metadata`` dict from the
         # serialized observation, so the reward components arrive in the declared
         # ``components`` field (and the diagnostic message in ``error``). Rebuild

@@ -84,8 +84,9 @@ class SophistryBenchSprintEnvironment(
         # gold?). It is withheld from the wire observation by default so a naive
         # harness that forwards the whole observation to the policy can't leak it.
         # Trusted measurement code can opt in (SPRINT_EXPOSE_CORRECTNESS=1) to get
-        # it back in ``metadata``/``components``; it always counts toward the
-        # weighted reward regardless.
+        # it back in ``metadata``/``components``. This flag controls only surfacing,
+        # not weighting: correctness affects ``reward`` only via its SPRINT_WEIGHTS
+        # entry, which is 0 by default (so it does not change the default reward).
         self.expose_correctness = (
             expose_correctness
             if expose_correctness is not None

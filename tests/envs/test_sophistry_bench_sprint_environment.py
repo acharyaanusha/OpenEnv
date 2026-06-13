@@ -86,6 +86,16 @@ def test_client_parses_step_result():
     assert result.done is True
 
 
+def test_parse_result_rejects_malformed_payload():
+    # A missing/null "observation" is a protocol error: fail loudly, don't build
+    # a silently-empty observation.
+    client = SophistryBenchSprintEnv.__new__(SophistryBenchSprintEnv)
+    with pytest.raises(ValueError):
+        client._parse_result({"reward": 0.0, "done": True})
+    with pytest.raises(ValueError):
+        client._parse_result({"observation": None, "reward": 0.0, "done": True})
+
+
 def test_step_text_is_async():
     # Must be a coroutine function so `await env.step_text(...)` yields a
     # StepResult (not a coroutine) and `.sync()` auto-wraps it like base step().

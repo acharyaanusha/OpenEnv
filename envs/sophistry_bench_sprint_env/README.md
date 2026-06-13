@@ -35,7 +35,7 @@ Single step. `reset()` issues a task; `step(AdvocacyAction(text=...))` scores it
 | `SPRINT_PASSAGE_CHARS` | `2000` | Passage char cap |
 | `SPRINT_SEED` | `0` | Distractor-selection seed (deterministic) |
 | `SPRINT_WEIGHTS` | `1,0,0,0,0,0,0,0` | 8 reward weights, order: `aggregate, correctness, n_claims, n_citations, alternation_canary, starts_with_canary, length_band_canary, template_echo_canary`. Do **not** weight canaries during training. |
-| `SPRINT_EXPOSE_CORRECTNESS` | `0` | When `1`/`true`, surface `correctness_reward` (the hidden ground truth) in the wire `metadata`/`components`. Off by default so a harness can't accidentally leak it to the policy. It always counts toward the weighted reward regardless of this flag. |
+| `SPRINT_EXPOSE_CORRECTNESS` | `0` | When `1`/`true`, surface `correctness_reward` (the hidden ground truth) in the wire `metadata`/`components`. Off by default so a harness can't accidentally leak it to the policy. This flag controls only *surfacing*, not *weighting*: correctness affects `reward` only via its `SPRINT_WEIGHTS` entry, which is `0` by default. |
 
 ## Usage
 
