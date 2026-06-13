@@ -2,6 +2,7 @@
 """Tests for the sophistry-bench sprint OpenEnv environment."""
 
 import asyncio
+import inspect
 import os
 import sys
 
@@ -81,6 +82,12 @@ def test_client_parses_step_result():
     assert result.done is True
 
 
+def test_step_text_is_async():
+    # Must be a coroutine function so `await env.step_text(...)` yields a
+    # StepResult (not a coroutine) and `.sync()` auto-wraps it like base step().
+    assert inspect.iscoroutinefunction(SophistryBenchSprintEnv.step_text)
+
+
 def test_reset_returns_task_observation():
     env = _env()
     obs = env.reset(seed=0)
@@ -155,6 +162,11 @@ def test_aggregate_matches_canonical_verifiers_reward():
     if not getattr(rubric, "funcs", None) and getattr(rubric, "rubrics", None):
         rubric = rubric.rubrics[0]
     aggregate_fn = rubric.funcs[0]  # aggregate_reward is index 0
+    # Fail loudly (not with IndexError/AttributeError) if upstream reorders funcs
+    # within the pinned <0.2.0 range.
+    assert aggregate_fn.__name__ == "aggregate_reward", (
+        f"expected rubric.funcs[0] to be aggregate_reward, got {aggregate_fn.__name__}"
+    )
     completion = [{"role": "assistant", "content": text}]
     # Formula parity: feed the canonical fn the canonical side's own passage.
     state = {"info": {"passage": canonical_passage}}

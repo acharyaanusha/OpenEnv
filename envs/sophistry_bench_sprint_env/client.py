@@ -21,9 +21,14 @@ from .models import AdvocacyAction, AdvocacyObservation
 class SophistryBenchSprintEnv(EnvClient[AdvocacyAction, AdvocacyObservation, State]):
     """Typed client for the sophistry-bench sprint OpenEnv environment."""
 
-    def step_text(self, text: str) -> StepResult[AdvocacyObservation]:
-        """Convenience: submit a raw argument string as an AdvocacyAction."""
-        return super().step(AdvocacyAction(text=text))
+    async def step_text(self, text: str) -> StepResult[AdvocacyObservation]:
+        """Convenience: submit a raw argument string as an AdvocacyAction.
+
+        ``async`` so it returns a ``StepResult`` (not a coroutine) and is wrapped
+        by ``.sync()`` like the base ``step``/``reset`` — call ``await
+        env.step_text(...)``, or ``env.sync().step_text(...)`` on a sync client.
+        """
+        return await super().step(AdvocacyAction(text=text))
 
     def _step_payload(self, action: AdvocacyAction) -> dict:
         return action.model_dump()

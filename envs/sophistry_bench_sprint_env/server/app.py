@@ -6,10 +6,10 @@
 
 """FastAPI application for the Sophistry-Bench Sprint Environment."""
 
-from openenv.core.env_server import create_app
-
 try:
     # Installed-package context (e.g. import sophistry_bench_sprint_env.server.app)
+    from openenv.core.env_server.http_server import create_app
+
     from ..models import AdvocacyAction, AdvocacyObservation
     from .sophistry_bench_sprint_environment import SophistryBenchSprintEnvironment
 except ImportError:
@@ -18,6 +18,7 @@ except ImportError:
     # name ``sophistry_bench_sprint_env`` via the load-bearing ``package-dir``
     # remap in pyproject.toml (source lives at the env-dir root, not a subdir).
     # If that remap is changed, container startup breaks here with a ModuleNotFound.
+    from openenv.core.env_server.http_server import create_app
     from sophistry_bench_sprint_env.models import AdvocacyAction, AdvocacyObservation
     from sophistry_bench_sprint_env.server.sophistry_bench_sprint_environment import (
         SophistryBenchSprintEnvironment,

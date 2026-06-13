@@ -2385,7 +2385,6 @@ dependencies = [
     { name = "fastapi" },
     { name = "openenv", extra = ["core"] },
     { name = "pydantic" },
-    { name = "requests" },
     { name = "sophistry-bench-sprint" },
     { name = "uvicorn" },
 ]
@@ -2405,7 +2404,6 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.0.3" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.21" },
     { name = "pytest-cov", marker = "extra == 'dev'" },
-    { name = "requests", specifier = ">=2.31.0" },
     { name = "sophistry-bench-sprint", specifier = ">=0.1.6,<0.2.0" },
     { name = "uvicorn", specifier = ">=0.24.0" },
 ]

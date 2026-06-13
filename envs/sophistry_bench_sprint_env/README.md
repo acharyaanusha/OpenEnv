@@ -38,19 +38,34 @@ Single step. `reset()` issues a task; `step(AdvocacyAction(text=...))` scores it
 
 ## Usage
 
+The client is **async by default** (like every OpenEnv client):
+
 ```python
+import asyncio
+
 from sophistry_bench_sprint_env import SophistryBenchSprintEnv
 
-# Run the deployed Hugging Face Space:
-env = SophistryBenchSprintEnv.from_env("anushaacharya/sophistry_bench_sprint_env")
-# ...or a local image: SophistryBenchSprintEnv.from_docker_image("openenv-sophistry_bench_sprint:latest")
-try:
-    obs = env.reset().observation
-    print(obs.prompt, obs.answer_to_defend)
-    result = env.step_text("<claim>...</claim><cite>...</cite>")
+
+async def main():
+    # Deployed Hugging Face Space (or .from_docker_image("openenv-sophistry_bench_sprint:latest")):
+    client = await SophistryBenchSprintEnv.from_env("anushaacharya/sophistry_bench_sprint_env")
+    async with client:
+        obs = (await client.reset()).observation
+        print(obs.prompt, obs.answer_to_defend)
+        result = await client.step_text("<claim>...</claim><cite>...</cite>")
+        print(result.reward, result.observation.metadata)
+
+
+asyncio.run(main())
+```
+
+For **synchronous usage**, use the `.sync()` wrapper:
+
+```python
+with SophistryBenchSprintEnv(base_url="http://localhost:8000").sync() as client:
+    obs = client.reset().observation
+    result = client.step_text("<claim>...</claim><cite>...</cite>")
     print(result.reward, result.observation.metadata)
-finally:
-    env.close()
 ```
 
 `result.observation.metadata` contains all eight reward components every step — the canary
