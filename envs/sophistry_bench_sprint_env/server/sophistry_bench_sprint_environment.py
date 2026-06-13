@@ -18,9 +18,8 @@ except ImportError:  # standalone import path
     from core.env_server.types import State
 
 from sophistry_bench_sprint import (
+    aggregate_reward,
     alternation_canary,
-    citation_grounding,
-    claim_count_cliff,
     length_band_canary,
     load_quality_from_json,
     packaged_quality_path,
@@ -183,14 +182,9 @@ class SophistryBenchSprintEnvironment(
         claims = parse_claims(text)
         cites = parse_citations(text)
 
-        cliff = claim_count_cliff(len(claims))
-        ground = citation_grounding(claims, cites, self._current_passage)
-        # LOAD-BEARING: this is the canonical ``aggregate_reward`` proxy. It is an
-        # inner closure of ``sophistry_bench_sprint._build_reward_funcs`` (not a
-        # public export), so it cannot be imported and is reproduced here. If the
-        # package changes how sub-scores combine, this MUST be updated in lockstep;
-        # ``test_aggregate_matches_canonical_verifiers_reward`` pins them to 1e-9.
-        aggregate = (cliff + ground) / 2.0
+        # Imported from the canonical package (sophistry-bench-sprint>=0.1.6) — the
+        # aggregate formula is no longer reproduced here, so it can't drift.
+        aggregate = aggregate_reward(claims, cites, self._current_passage)
         correctness = 1.0 if self._current_is_gold else 0.0
 
         metadata = {

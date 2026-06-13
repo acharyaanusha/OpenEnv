@@ -2406,7 +2406,7 @@ requires-dist = [
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.21" },
     { name = "pytest-cov", marker = "extra == 'dev'" },
     { name = "requests", specifier = ">=2.31.0" },
-    { name = "sophistry-bench-sprint", specifier = ">=0.1.5,<0.2.0" },
+    { name = "sophistry-bench-sprint", specifier = ">=0.1.6,<0.2.0" },
     { name = "uvicorn", specifier = ">=0.24.0" },
 ]
 provides-extras = ["dev"]
@@ -4133,16 +4133,16 @@ wheels = [
 
 [[package]]
 name = "sophistry-bench-sprint"
-version = "0.1.5"
+version = "0.1.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "datasets" },
     { name = "pydantic" },
     { name = "verifiers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/70/f6/77c2ca00d554fd4d39e11d01a3091d918ce2265af5464d05cb520b1e47d8/sophistry_bench_sprint-0.1.5.tar.gz", hash = "sha256:640c59abf929fccc1b555aae634c3a8f170e46de04af1681e955697c221cd327", size = 498630, upload-time = "2026-06-11T02:23:45.676Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/8b/0d/2ebc2235781276eb7f6ae2afb6825e7e05b69e10869f2f5ac9d769a66cab/sophistry_bench_sprint-0.1.6.tar.gz", hash = "sha256:12ad3248ecf65e8e242499549c67f1a9786a1abb08363f4f10ed55e4ae54d95c", size = 498758, upload-time = "2026-06-13T02:56:43.456Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0f/f7/29a0a1ce5f3af0d5e469357c55b1157f353342e8beb792ce249720c0237e/sophistry_bench_sprint-0.1.5-py3-none-any.whl", hash = "sha256:bc2c29a3452aeee4e28a156926546922f16f3e58c2f63537ea253e99e0d75836", size = 502520, upload-time = "2026-06-11T02:23:43.747Z" },
+    { url = "https://files.pythonhosted.org/packages/78/2e/a0c5f1b327e83da4220e908f3cb3dc80a313fa4e3fe50ac3f07d3954fb43/sophistry_bench_sprint-0.1.6-py3-none-any.whl", hash = "sha256:55fa0e830b4b7c92bfb37d3fbb15b911ea15c19165788db0f39b1bdd13cdb474", size = 502650, upload-time = "2026-06-13T02:56:42.041Z" },
 ]
 
 [[package]]
