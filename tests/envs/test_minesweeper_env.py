@@ -382,3 +382,24 @@ class TestMinesweeperEnvironmentLogic(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_seeded_reset_is_reproducible_and_preserves_episode_id():
+    env = MinesweeperEnvironment()
+    env.reset(seed=42, episode_id="training-episode")
+    mines = set(env._mine_positions)
+    assert env.state.episode_id == "training-episode"
+    env.reset(seed=42)
+    assert env._mine_positions == mines
+
+
+def test_reset_rng_is_independent_of_other_sessions():
+    first, second = MinesweeperEnvironment(), MinesweeperEnvironment()
+    first.reset(seed=42)
+    second.reset(seed=123)
+    first.reset()
+    mines = set(first._mine_positions)
+    reference = MinesweeperEnvironment()
+    reference.reset(seed=42)
+    reference.reset()
+    assert reference._mine_positions == mines

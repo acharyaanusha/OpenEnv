@@ -61,6 +61,7 @@ class MinesweeperEnvironment(
         self.height = height
         self.width = width
         self.num_mines = num_mines
+        self._rng = random.Random()
 
         self._state = State(episode_id=str(uuid4()), step_count=0)
         self._reset_count = 0
@@ -74,14 +75,24 @@ class MinesweeperEnvironment(
         ]
         self._game_status = GameStatus.ONGOING
 
-    def reset(self) -> MinesweeperObservation:
+    def reset(
+        self,
+        seed: Optional[int] = None,
+        episode_id: Optional[str] = None,
+        **kwargs: Any,
+    ) -> MinesweeperObservation:
         """
         Reset the environment and starts a new game.
 
         Returns:
             MinesweeperObservation with initial board state
         """
-        self._state = State(episode_id=str(uuid4()), step_count=0)
+        if seed is not None:
+            self._rng.seed(seed)
+        self._state = State(
+            episode_id=episode_id if episode_id is not None else str(uuid4()),
+            step_count=0,
+        )
         self._reset_count += 1
 
         # Reset internal game state
@@ -155,8 +166,8 @@ class MinesweeperEnvironment(
         """Randomly place mines on the board."""
         self._mine_positions.clear()
         while len(self._mine_positions) < self.num_mines:
-            r = random.randint(0, self.height - 1)
-            c = random.randint(0, self.width - 1)
+            r = self._rng.randint(0, self.height - 1)
+            c = self._rng.randint(0, self.width - 1)
             self._mine_positions.add((r, c))
 
     def _compute_mine_counts(self) -> None:
