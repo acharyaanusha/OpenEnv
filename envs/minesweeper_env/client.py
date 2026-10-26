@@ -17,12 +17,7 @@ from openenv.core.client_types import StepResult
 from openenv.core.env_client import EnvClient
 from openenv.core.env_server.types import State
 
-try:
-    # In-repo imports (when running from OpenEnv repository)
-    from .models import MinesweeperAction, MinesweeperObservation
-except ImportError:
-    # Standalone imports (when this module is imported as a top-level package)
-    from models import MinesweeperAction, MinesweeperObservation
+from .models import MinesweeperAction, MinesweeperObservation
 
 
 class MinesweeperEnv(EnvClient[MinesweeperAction, MinesweeperObservation, State]):

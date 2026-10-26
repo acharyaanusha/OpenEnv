@@ -13,10 +13,10 @@ The game ends when all non-mine cells are revealed (win) or a mine is revealed (
 ## Quick Start
 
 ```python
-from envs.minesweeper_env import MinesweeperAction, MinesweeperEnv
+from minesweeper_env import MinesweeperAction, MinesweeperEnv
 
 # Create environment from Docker image
-minesweeper_env = MinesweeperEnv.from_docker_image("minesweeper-env:latest")
+minesweeper_env = MinesweeperEnv.from_docker_image("minesweeper-env:latest").sync()
 
 try:
     # Reset the environment
@@ -105,7 +105,7 @@ These can be configured when initializing the environment server.
 If you have a server already running:
 
 ```python
-from envs.minesweeper_env import MinesweeperEnv
+from minesweeper_env import MinesweeperEnv
 
 # Connect to existing server
 minesweeper_env = MinesweeperEnv(base_url="http://localhost:8000")

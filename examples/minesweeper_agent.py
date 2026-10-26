@@ -16,10 +16,12 @@ import sys
 from pathlib import Path
 from typing import List, Set, Tuple
 
-# Add src to path for imports
+# Add the local library and environment packages to the import path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from envs.minesweeper_env import MinesweeperEnv, MinesweeperAction, GameStatus
+sys.path.insert(0, str(Path(__file__).parent.parent / "envs"))
+
+from minesweeper_env import GameStatus, MinesweeperAction, MinesweeperEnv
 
 # Configuration
 MAX_EPISODES = 5
@@ -96,9 +98,9 @@ class SimpleMinesweeperAgent:
         for r in range(len(board)):
             for c in range(len(board[0])):
                 cell = board[r][c]
-                if cell != -1 and cell != 'F':
+                if cell != -1 and cell != "F":
                     self.revealed_positions.add((r, c))
-                if cell == 'F':
+                if cell == "F":
                     self.flagged_positions.add((r, c))
 
     def _get_unrevealed_unflagged_cells(self, board) -> Set[Tuple[int, int]]:
@@ -127,12 +129,10 @@ class SimpleMinesweeperAgent:
                 if isinstance(cell, int) and 0 <= cell <= 8:
                     neighbors = self._get_neighbors(r, c)
                     unrevealed_neighbors = [
-                        (nr, nc) for nr, nc in neighbors
-                        if board[nr][nc] == -1
+                        (nr, nc) for nr, nc in neighbors if board[nr][nc] == -1
                     ]
                     flagged_neighbors = [
-                        (nr, nc) for nr, nc in neighbors
-                        if board[nr][nc] == 'F'
+                        (nr, nc) for nr, nc in neighbors if board[nr][nc] == "F"
                     ]
 
                     # If all mines are flagged, remaining unrevealed cells are safe
@@ -158,12 +158,10 @@ class SimpleMinesweeperAgent:
                 if isinstance(cell, int) and 1 <= cell <= 8:
                     neighbors = self._get_neighbors(r, c)
                     unrevealed_neighbors = [
-                        (nr, nc) for nr, nc in neighbors
-                        if board[nr][nc] == -1
+                        (nr, nc) for nr, nc in neighbors if board[nr][nc] == -1
                     ]
                     flagged_neighbors = [
-                        (nr, nc) for nr, nc in neighbors
-                        if board[nr][nc] == 'F'
+                        (nr, nc) for nr, nc in neighbors if board[nr][nc] == "F"
                     ]
 
                     # If unrevealed + flagged equals mine count,
@@ -199,9 +197,9 @@ def print_board(board):
         for cell in row:
             if cell == -1:
                 print(" . ", end="")
-            elif cell == 'F':
+            elif cell == "F":
                 print(" F ", end="")
-            elif cell == '*':
+            elif cell == "*":
                 print(" * ", end="")
             else:
                 print(f" {cell} ", end="")
@@ -219,7 +217,7 @@ def main():
     print(f"Connecting to Minesweeper server at {BASE_URL}...")
 
     # Option 1: Connect to existing server
-    env = MinesweeperEnv(base_url=BASE_URL)
+    env = MinesweeperEnv(base_url=BASE_URL).sync()
 
     # Option 2: Start from Docker image (uncomment to use)
     # env = MinesweeperEnv.from_docker_image("minesweeper_env-env:latest")
@@ -258,7 +256,9 @@ def main():
                 reward = result.reward or 0.0
                 episode_reward += reward
 
-                print(f"Step {step}: {action.action_type} ({action.row}, {action.col}) -> reward: {reward:+.2f}")
+                print(
+                    f"Step {step}: {action.action_type} ({action.row}, {action.col}) -> reward: {reward:+.2f}"
+                )
                 print_board(observation.board)
 
                 # Handle game_status being either an Enum or an int
@@ -269,18 +269,26 @@ def main():
                 else:
                     status_name = str(observation.game_status)
 
-                print(f"Status: {status_name} | Revealed: {observation.cells_revealed} | Flags: {observation.flags_placed}")
+                print(
+                    f"Status: {status_name} | Revealed: {observation.cells_revealed} | Flags: {observation.flags_placed}"
+                )
 
                 if result.done:
                     if status_name == "WON":
-                        print(f"\n🎉 Episode {episode}: WON! Total reward: {episode_reward:.2f}")
+                        print(
+                            f"\n🎉 Episode {episode}: WON! Total reward: {episode_reward:.2f}"
+                        )
                         total_wins += 1
                     elif status_name == "LOST":
-                        print(f"\n💥 Episode {episode}: LOST! Total reward: {episode_reward:.2f}")
+                        print(
+                            f"\n💥 Episode {episode}: LOST! Total reward: {episode_reward:.2f}"
+                        )
                         total_losses += 1
                     break
             else:
-                print(f"\n⏰ Episode {episode}: Reached max steps ({MAX_STEPS_PER_EPISODE})")
+                print(
+                    f"\n⏰ Episode {episode}: Reached max steps ({MAX_STEPS_PER_EPISODE})"
+                )
 
         # Summary
         print(f"\n{'=' * 60}")

@@ -13,6 +13,7 @@ import sys
 import time
 import unittest
 
+import pytest
 import requests
 from envs.minesweeper_env import (
     GameStatus,
@@ -403,3 +404,41 @@ def test_reset_rng_is_independent_of_other_sessions():
     reference.reset(seed=42)
     reference.reset()
     assert reference._mine_positions == mines
+
+
+@pytest.mark.parametrize(
+    "height,width,num_mines",
+    [(0, 5, 1), (5, 0, 1), (-1, 5, 1), (2, 2, -1), (2, 2, 4), (2, 2, 5)],
+)
+def test_invalid_board_configuration(height, width, num_mines):
+    with pytest.raises(ValueError):
+        MinesweeperEnvironment(height=height, width=width, num_mines=num_mines)
+
+
+def test_board_schema_rejects_unknown_cell_values():
+    from pydantic import ValidationError
+
+    observation = MinesweeperEnvironment().reset(seed=42)
+    payload = observation.model_dump(mode="json")
+    payload["board"][0][0] = "unknown"
+    with pytest.raises(ValidationError):
+        MinesweeperObservation.model_validate(payload)
+
+
+def test_client_wire_contract_excludes_reward_and_hidden_state():
+    from openenv.core.env_server.serialization import serialize_observation
+
+    env = MinesweeperEnvironment(height=2, width=2, num_mines=1)
+    env.reset(seed=42)
+    row, col = next(iter(env._mine_positions))
+    observation = env.step(MinesweeperAction(row=row, col=col, action_type="reveal"))
+    payload = serialize_observation(observation)
+    assert "reward" not in payload["observation"]
+    assert "done" not in payload["observation"]
+    assert "mine_locations" not in payload["observation"]
+    assert set(env.state.model_dump()) == {"episode_id", "step_count"}
+    client = MinesweeperEnv(base_url="http://localhost:8000")
+    result = client._parse_result(payload)
+    assert result.reward == -10.0
+    assert result.done is True
+    assert result.observation.game_status == GameStatus.LOST

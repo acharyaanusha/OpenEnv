@@ -12,7 +12,7 @@ to identify mines on a grid board.
 """
 
 from enum import Enum
-from typing import Any, List, Set, Tuple
+from typing import List, Literal, Set, Tuple
 
 from openenv.core.env_server.types import Action, Observation
 from pydantic import BaseModel, Field
@@ -61,7 +61,9 @@ class MinesweeperObservation(Observation):
         game_status: Current status of the game - ongoing, won, or lost.
     """
 
-    board: List[List[Any]] = Field(default_factory=list, description="2D board state")
+    board: List[List[Literal[-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, "F", "*"]]] = Field(
+        default_factory=list, description="2D board state"
+    )
     num_mines: int = Field(..., ge=0, description="Total number of mines")
     flags_placed: int = Field(..., ge=0, description="Number of flags placed")
     cells_revealed: int = Field(..., ge=0, description="Number of cells revealed")

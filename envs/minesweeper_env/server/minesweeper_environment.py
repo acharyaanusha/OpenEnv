@@ -58,6 +58,10 @@ class MinesweeperEnvironment(
             num_mines: Number of mines to place on the board.
         """
         super().__init__()
+        if height <= 0 or width <= 0:
+            raise ValueError("Board dimensions must be positive")
+        if not 0 <= num_mines < height * width:
+            raise ValueError("Mine count must leave at least one safe cell")
         self.height = height
         self.width = width
         self.num_mines = num_mines

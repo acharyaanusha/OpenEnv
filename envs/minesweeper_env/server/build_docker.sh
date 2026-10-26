@@ -21,10 +21,10 @@ echo ""
 # Get script directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-# Navigate to OpenEnv root (4 levels up from server/)
-OPENENV_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
+# Use the environment package as the build context
+ENV_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-echo "📁 OpenEnv root: $OPENENV_ROOT"
+echo "📁 Environment directory: $ENV_DIR"
 echo ""
 
 # Build Minesweeper environment image
@@ -32,7 +32,7 @@ echo "⏳ Building..."
 docker build \
     -f "$SCRIPT_DIR/Dockerfile" \
     -t "$IMAGE_NAME" \
-    "$OPENENV_ROOT"
+    "$ENV_DIR"
 
 if [ $? -eq 0 ]; then
     echo ""
