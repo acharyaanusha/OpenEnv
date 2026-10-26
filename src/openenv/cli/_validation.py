@@ -1,8 +1,4 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-#
-# This source code is licensed under the BSD-style license found in the
-# LICENSE file in the root directory of this source tree.
+# SPDX-License-Identifier: BSD-3-Clause
 
 """
 Validation utilities for multi-mode deployment readiness.
@@ -440,30 +436,37 @@ def _has_main_guard_call(app_content: str) -> bool:
         )
 
     for node in ast.iter_child_nodes(tree):
-        if not isinstance(node, ast.If):
+        if not isinstance(node, ast.If) or not _is_main_guard(node.test):
             continue
 
-        test = node.test
-        if not (
-            isinstance(test, ast.Compare)
-            and isinstance(test.left, ast.Name)
-            and test.left.id == "__name__"
-            and len(test.ops) == 1
-            and isinstance(test.ops[0], ast.Eq)
-            and len(test.comparators) == 1
-            and isinstance(test.comparators[0], ast.Constant)
-            and test.comparators[0].value == "__main__"
-        ):
-            continue
-
-        for guarded_node in node.body:
-            for candidate in ast.walk(guarded_node):
-                if isinstance(candidate, ast.Call):
-                    func = candidate.func
-                    if isinstance(func, ast.Name) and func.id == "main":
-                        return True
+        if any(_contains_main_call(guarded_node) for guarded_node in node.body):
+            return True
 
     return False
+
+
+def _is_main_guard(test: ast.expr) -> bool:
+    """Return True for `if __name__ == "__main__"` tests."""
+    return (
+        isinstance(test, ast.Compare)
+        and isinstance(test.left, ast.Name)
+        and test.left.id == "__name__"
+        and len(test.ops) == 1
+        and isinstance(test.ops[0], ast.Eq)
+        and len(test.comparators) == 1
+        and isinstance(test.comparators[0], ast.Constant)
+        and test.comparators[0].value == "__main__"
+    )
+
+
+def _contains_main_call(node: ast.AST) -> bool:
+    """Return True when an AST node contains a direct `main(...)` call."""
+    return any(
+        isinstance(candidate, ast.Call)
+        and isinstance(candidate.func, ast.Name)
+        and candidate.func.id == "main"
+        for candidate in ast.walk(node)
+    )
 
 
 _OPENENV_RUNTIME_DEP_RE = re.compile(r"^openenv(?:\s*(?:$|[<>=!~@;])|\[)")
@@ -495,8 +498,6 @@ def _dockerfile_installs_openenv_runtime(env_path: Path) -> bool:
                 return True
             if "openenv-core" in stripped:
                 return True
-            if "git+https://github.com/meta-pytorch/openenv" in stripped:
-                return True
 
     return False
 
@@ -513,7 +514,8 @@ def validate_multi_mode_deployment(env_path: Path) -> tuple[bool, list[str]]:
     5. Required dependencies are present
 
     Returns:
-        Tuple of (is_valid, list of issues found)
+        `tuple` of `(is_valid, issues)` where `is_valid` is a `bool` and `issues` is a
+        `list` of issue strings found during validation.
     """
     issues = []
 
@@ -581,7 +583,7 @@ def get_deployment_modes(env_path: Path) -> dict[str, bool]:
     Check which deployment modes are supported by the environment.
 
     Returns:
-        Dictionary with deployment mode names and whether they're supported
+        `dict` mapping deployment mode names to whether they are supported.
     """
     modes = {
         "docker": False,
@@ -610,7 +612,7 @@ def format_validation_report(env_name: str, is_valid: bool, issues: list[str]) -
     Format a validation report for display.
 
     Returns:
-        Formatted report string
+        `str`: formatted validation report.
     """
     if is_valid:
         return f"[OK] {env_name}: Ready for multi-mode deployment"

@@ -19,7 +19,7 @@ FROM python:3.11-slim
 # Set metadata
 LABEL maintainer="OpenEnv Team"
 LABEL description="OpenApp Environment with BrowserGym for UI agent training"
-LABEL org.opencontainers.image.source="https://github.com/meta-pytorch/OpenEnv"
+LABEL org.opencontainers.image.source="https://github.com/huggingface/OpenEnv"
 
 # Set working directory
 WORKDIR /app/env
@@ -83,7 +83,7 @@ RUN python -c "import open_apps; print('✓ OpenApps installed')"
 
 # Install openenv from GitHub with --no-deps to avoid openai>=2.7.2 conflict
 # Then install only the server dependencies (no openai needed for server)
-RUN pip install --no-cache-dir --no-deps "openenv[core]>=0.2.2" && \
+RUN pip install --no-cache-dir --no-deps "openenv>=0.2.2" && \
     pip install --no-cache-dir fastapi pydantic uvicorn requests websockets fastmcp "beartype>=0.17.2"
 
 # Install openapp_env and remaining dependencies
@@ -91,7 +91,7 @@ WORKDIR /app/env
 RUN pip install --no-cache-dir -e .
 
 # Ensure fastmcp runtime deps are on compatible versions after all installs.
-RUN pip install --no-cache-dir --upgrade "beartype>=0.22.6" "fastmcp>=2.14.5"
+RUN pip install --no-cache-dir --upgrade "beartype>=0.22.6" "fastmcp>=2.14.5" "fastapi>=0.116.0"
 
 # Verify installation
 RUN python -c "import openapp_env; print('✓ openapp_env installed')" && \
