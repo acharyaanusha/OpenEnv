@@ -214,27 +214,29 @@ class MinesweeperEnvironment(
             self._revealed_cells.add((row, col))
             return -10.0, None
 
-        self._reveal_recursive(row, col)
+        self._reveal_region(row, col)
         return 1.0, None
 
-    def _reveal_recursive(self, row: int, col: int) -> None:
-        """Recursively reveal cells with 0 adjacent mines."""
-        if not self._is_valid_position(row, col):
-            return
-        if (row, col) in self._revealed_cells or (row, col) in self._flags_placed:
-            return
+    def _reveal_region(self, row: int, col: int) -> None:
+        """Reveal connected empty cells and their numbered boundary."""
+        pending = [(row, col)]
+        while pending:
+            row, col = pending.pop()
+            if not self._is_valid_position(row, col):
+                continue
+            if (row, col) in self._revealed_cells or (row, col) in self._flags_placed:
+                continue
+            if (row, col) in self._mine_positions:
+                continue
 
-        if (row, col) in self._mine_positions:
-            return
+            self._revealed_cells.add((row, col))
 
-        self._revealed_cells.add((row, col))
-
-        if self._mine_counts[row][col] == 0:
-            for dr in [-1, 0, 1]:
-                for dc in [-1, 0, 1]:
-                    if dr == 0 and dc == 0:
-                        continue
-                    self._reveal_recursive(row + dr, col + dc)
+            if self._mine_counts[row][col] == 0:
+                for dr in [-1, 0, 1]:
+                    for dc in [-1, 0, 1]:
+                        if dr == 0 and dc == 0:
+                            continue
+                        pending.append((row + dr, col + dc))
 
     def _toggle_flag(self, row: int, col: int) -> Tuple[float, Optional[str]]:
         """Toggle a flag on the cell at (row, col).

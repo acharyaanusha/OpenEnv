@@ -500,3 +500,49 @@ def test_terminal_flags_do_not_award_bonus_and_reset_restores_it(win):
         assert observation.flags_placed == 0
     env.reset(seed=42)
     assert env.step(flag).reward == 0.5
+
+
+@pytest.mark.parametrize("height,width", [(1, 2000), (64, 64)])
+def test_large_empty_region_reveal(height, width):
+    env = MinesweeperEnvironment(height=height, width=width, num_mines=0)
+    env.reset(seed=42)
+
+    obs = env.step(MinesweeperAction(row=0, col=0, action_type="reveal"))
+
+    assert obs.board == [[0] * width for _ in range(height)]
+    assert obs.cells_revealed == height * width
+    assert obs.game_status == GameStatus.WON
+    assert obs.done is True
+    assert obs.reward == 1.0
+    terminal = env.step(MinesweeperAction(row=0, col=0, action_type="reveal"))
+    assert terminal.board == obs.board
+    assert terminal.done is True
+    assert terminal.reward == 0.0
+
+
+def test_large_flood_fill_preserves_flags_and_numbered_boundary():
+    env = MinesweeperEnvironment(height=1, width=2000, num_mines=1)
+    env.reset(seed=42)
+    env._mine_positions = {(0, 1998)}
+    env._compute_mine_counts()
+    env.step(MinesweeperAction(row=0, col=1500, action_type="flag"))
+
+    obs = env.step(MinesweeperAction(row=0, col=0, action_type="reveal"))
+    assert obs.board == [[0] * 1500 + ["F"] + [-1] * 499]
+    assert obs.cells_revealed == 1500
+    assert obs.game_status == GameStatus.ONGOING
+    assert obs.done is False
+    assert obs.reward == 1.0
+
+    env.step(MinesweeperAction(row=0, col=1500, action_type="flag"))
+    obs = env.step(MinesweeperAction(row=0, col=1500, action_type="reveal"))
+    assert obs.board == [[0] * 1997 + [1, -1, -1]]
+    assert obs.cells_revealed == 1998
+    assert obs.game_status == GameStatus.ONGOING
+    assert obs.done is False
+    assert obs.reward == 1.0
+
+    obs = env.step(MinesweeperAction(row=0, col=1999, action_type="reveal"))
+    assert obs.game_status == GameStatus.WON
+    assert obs.done is True
+    assert obs.reward == 1.0
