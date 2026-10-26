@@ -6,10 +6,10 @@
 
 """Test suite for Minesweeper Environment."""
 
-import os
-import signal
+import socket
 import subprocess
 import sys
+import tempfile
 import time
 import unittest
 
@@ -32,48 +32,64 @@ class TestMinesweeperEnv(unittest.IsolatedAsyncioTestCase):
     @classmethod
     def setUpClass(cls):
         """Start the server once for all tests."""
+        with socket.socket() as sock:
+            sock.bind(("127.0.0.1", 0))
+            port = sock.getsockname()[1]
+        cls.base_url = f"http://127.0.0.1:{port}"
+        server_log = tempfile.TemporaryFile(mode="w+")
+        cls.addClassCleanup(server_log.close)
         cls.server_process = subprocess.Popen(
-            [sys.executable, "-m", "envs.minesweeper_env.server.app"],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            [
+                sys.executable,
+                "-m",
+                "uvicorn",
+                "envs.minesweeper_env.server.app:app",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                str(port),
+            ],
+            stdin=subprocess.DEVNULL,
+            stdout=server_log,
+            stderr=subprocess.STDOUT,
         )
-        time.sleep(3)  # Give server time to start
+        # unittest skips tearDownClass when setUpClass fails.
+        cls.addClassCleanup(cls.tearDownClass)
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
+            if cls.server_process.poll() is not None:
+                break
+            try:
+                response = requests.get(cls.base_url + "/health", timeout=0.5)
+                if response.status_code == 200:
+                    return
+            except (requests.ConnectionError, requests.Timeout):
+                pass
+            time.sleep(0.1)
 
-        # Verify server is running
-        try:
-            response = requests.get("http://127.0.0.1:8000/health")
-            if response.status_code != 200:
-                raise RuntimeError("Server health check failed")
-        except requests.ConnectionError:
-            raise RuntimeError("Server did not start or is unreachable")
+        cls.tearDownClass()
+        server_log.seek(0)
+        raise RuntimeError(f"Server did not become healthy:\n{server_log.read()}")
 
     @classmethod
     def tearDownClass(cls):
-        """Clean up server after all tests."""
-        if cls.server_process:
+        """Clean up server after all tests, including failed setup."""
+        if cls.server_process is not None:
             cls.server_process.terminate()
             try:
                 cls.server_process.wait(timeout=5)
             except subprocess.TimeoutExpired:
-                os.kill(cls.server_process.pid, signal.SIGKILL)
-
-            for stream in [
-                cls.server_process.stdin,
-                cls.server_process.stdout,
-                cls.server_process.stderr,
-            ]:
-                if stream and not stream.closed:
-                    stream.close()
+                cls.server_process.kill()
+                cls.server_process.wait(timeout=5)
 
     async def test_minesweeper_env_client(self):
         """Test Minesweeper environment client initialization."""
-        async with MinesweeperEnv(base_url="http://127.0.0.1:8000") as client:
+        async with MinesweeperEnv(base_url=self.base_url) as client:
             assert isinstance(client, MinesweeperEnv)
 
     async def test_minesweeper_initial_state(self):
         """Test the initial state after reset."""
-        async with MinesweeperEnv(base_url="http://127.0.0.1:8000") as client:
+        async with MinesweeperEnv(base_url=self.base_url) as client:
             result = await client.reset()
             observation = result.observation
 
@@ -110,7 +126,7 @@ class TestMinesweeperEnv(unittest.IsolatedAsyncioTestCase):
 
     async def test_reveal_action(self):
         """Test revealing a cell."""
-        async with MinesweeperEnv(base_url="http://127.0.0.1:8000") as client:
+        async with MinesweeperEnv(base_url=self.base_url) as client:
             await client.reset()
 
             # Try revealing a cell
@@ -125,7 +141,7 @@ class TestMinesweeperEnv(unittest.IsolatedAsyncioTestCase):
 
     async def test_flag_action(self):
         """Test placing a flag."""
-        async with MinesweeperEnv(base_url="http://127.0.0.1:8000") as client:
+        async with MinesweeperEnv(base_url=self.base_url) as client:
             await client.reset()
 
             # Place a flag
@@ -139,7 +155,7 @@ class TestMinesweeperEnv(unittest.IsolatedAsyncioTestCase):
 
     async def test_toggle_flag(self):
         """Test toggling a flag on and off."""
-        async with MinesweeperEnv(base_url="http://127.0.0.1:8000") as client:
+        async with MinesweeperEnv(base_url=self.base_url) as client:
             await client.reset()
 
             # Place a flag
@@ -156,7 +172,7 @@ class TestMinesweeperEnv(unittest.IsolatedAsyncioTestCase):
 
     async def test_invalid_position(self):
         """Test action with invalid position."""
-        async with MinesweeperEnv(base_url="http://127.0.0.1:8000") as client:
+        async with MinesweeperEnv(base_url=self.base_url) as client:
             await client.reset()
 
             # Try invalid row
@@ -179,7 +195,7 @@ class TestMinesweeperEnv(unittest.IsolatedAsyncioTestCase):
 
     async def test_reveal_already_revealed(self):
         """Test revealing an already revealed cell."""
-        async with MinesweeperEnv(base_url="http://127.0.0.1:8000") as client:
+        async with MinesweeperEnv(base_url=self.base_url) as client:
             await client.reset()
 
             # Find a safe revealed cell to re-target. Mines end the game, so
@@ -211,7 +227,7 @@ class TestMinesweeperEnv(unittest.IsolatedAsyncioTestCase):
 
     async def test_game_status_ongoing(self):
         """Test that game status remains ONGOING during normal play."""
-        async with MinesweeperEnv(base_url="http://127.0.0.1:8000") as client:
+        async with MinesweeperEnv(base_url=self.base_url) as client:
             await client.reset()
 
             # Make a few safe moves
@@ -228,7 +244,7 @@ class TestMinesweeperEnv(unittest.IsolatedAsyncioTestCase):
 
     async def test_board_cell_values(self):
         """Test that board cells contain valid values."""
-        async with MinesweeperEnv(base_url="http://127.0.0.1:8000") as client:
+        async with MinesweeperEnv(base_url=self.base_url) as client:
             await client.reset()
 
             # Reveal a cell
@@ -250,7 +266,7 @@ class TestMinesweeperEnv(unittest.IsolatedAsyncioTestCase):
 
     async def test_metadata_in_observation(self):
         """Test that observations contain metadata."""
-        async with MinesweeperEnv(base_url="http://127.0.0.1:8000") as client:
+        async with MinesweeperEnv(base_url=self.base_url) as client:
             result = await client.reset()
             observation = result.observation
 
@@ -261,7 +277,7 @@ class TestMinesweeperEnv(unittest.IsolatedAsyncioTestCase):
 
     async def test_multiple_steps(self):
         """Test taking multiple steps in the environment."""
-        async with MinesweeperEnv(base_url="http://127.0.0.1:8000") as client:
+        async with MinesweeperEnv(base_url=self.base_url) as client:
             await client.reset()
 
             # Take several actions
@@ -277,7 +293,7 @@ class TestMinesweeperEnv(unittest.IsolatedAsyncioTestCase):
 
     async def test_reset_clears_state(self):
         """Test that reset properly clears the game state."""
-        async with MinesweeperEnv(base_url="http://127.0.0.1:8000") as client:
+        async with MinesweeperEnv(base_url=self.base_url) as client:
             # First game
             await client.reset()
             action = MinesweeperAction(row=0, col=0, action_type="flag")
@@ -546,3 +562,51 @@ def test_large_flood_fill_preserves_flags_and_numbered_boundary():
     assert obs.game_status == GameStatus.WON
     assert obs.done is True
     assert obs.reward == 1.0
+
+
+def test_server_fixture_waits_for_delayed_startup(monkeypatch):
+    """A healthy server can take longer than three seconds to import."""
+    popen = subprocess.Popen
+
+    def delayed_start(args, **kwargs):
+        return popen(
+            [
+                args[0],
+                "-c",
+                "import runpy, sys, time; time.sleep(4); "
+                "sys.argv = sys.argv[1:]; "
+                "runpy.run_module(sys.argv[0], run_name='__main__')",
+                *args[2:],
+            ],
+            **kwargs,
+        )
+
+    monkeypatch.setattr(subprocess, "Popen", delayed_start)
+    try:
+        TestMinesweeperEnv.setUpClass()
+        response = requests.get(TestMinesweeperEnv.base_url + "/health", timeout=1)
+        assert response.status_code == 200
+    finally:
+        TestMinesweeperEnv.tearDownClass()
+        TestMinesweeperEnv.doClassCleanups()
+    assert TestMinesweeperEnv.server_process.poll() is not None
+
+
+def test_server_fixture_reports_child_failure_and_cleans_up(monkeypatch):
+    """Startup failures expose child stderr and do not leak the process."""
+    popen = subprocess.Popen
+
+    def failed_start(args, **kwargs):
+        return popen(
+            [args[0], "-c", "raise RuntimeError('startup regression sentinel')"],
+            **kwargs,
+        )
+
+    monkeypatch.setattr(subprocess, "Popen", failed_start)
+    try:
+        with pytest.raises(RuntimeError, match="startup regression sentinel"):
+            TestMinesweeperEnv.setUpClass()
+    finally:
+        TestMinesweeperEnv.tearDownClass()
+        TestMinesweeperEnv.doClassCleanups()
+    assert TestMinesweeperEnv.server_process.poll() is not None
