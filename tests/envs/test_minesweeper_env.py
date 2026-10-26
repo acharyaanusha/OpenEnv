@@ -442,3 +442,61 @@ def test_client_wire_contract_excludes_reward_and_hidden_state():
     assert result.reward == -10.0
     assert result.done is True
     assert result.observation.game_status == GameStatus.LOST
+
+
+def test_flag_rewards_are_bounded_per_mine_and_reset_per_episode():
+    env = MinesweeperEnvironment(height=3, width=3, num_mines=2)
+    for episode in range(2):
+        initial = env.reset(seed=42, episode_id=str(episode))
+        assert initial.reward == 0.0
+        assert initial.flags_placed == 0
+        assert initial.done is False
+        assert env.state.step_count == 0
+        total = 0.0
+        for row in range(3):
+            for col in range(3):
+                action = MinesweeperAction(row=row, col=col, action_type="flag")
+                for cycle in range(10):
+                    flagged = env.step(action)
+                    expected = (
+                        0.5 if cycle == 0 and (row, col) in env._mine_positions else 0.0
+                    )
+                    assert flagged.reward == expected
+                    assert flagged.board[row][col] == "F"
+                    total += flagged.reward
+                    unflagged = env.step(action)
+                    assert unflagged.reward == 0.0
+                    assert unflagged.board[row][col] == -1
+                    assert unflagged.done is False
+        assert total == 0.5 * env.num_mines
+        # Reset while a rewarded flag remains placed, too.
+        row, col = next(iter(env._mine_positions))
+        assert (
+            env.step(MinesweeperAction(row=row, col=col, action_type="flag")).reward
+            == 0.0
+        )
+
+
+@pytest.mark.parametrize("win", [False, True])
+def test_terminal_flags_do_not_award_bonus_and_reset_restores_it(win):
+    env = MinesweeperEnvironment(height=2, width=2, num_mines=1)
+    env.reset(seed=42)
+    mine = next(iter(env._mine_positions))
+    targets = (
+        [(r, c) for r in range(2) for c in range(2) if (r, c) != mine]
+        if win
+        else [mine]
+    )
+    for row, col in targets:
+        terminal = env.step(MinesweeperAction(row=row, col=col, action_type="reveal"))
+    assert terminal.done is True
+    assert terminal.game_status == (GameStatus.WON if win else GameStatus.LOST)
+    flag = MinesweeperAction(row=mine[0], col=mine[1], action_type="flag")
+    for _ in range(4):
+        observation = env.step(flag)
+        assert observation.reward == 0.0
+        assert observation.done is True
+        assert observation.board == terminal.board
+        assert observation.flags_placed == 0
+    env.reset(seed=42)
+    assert env.step(flag).reward == 0.5

@@ -74,6 +74,7 @@ class MinesweeperEnvironment(
         self._mine_positions: Set[Tuple[int, int]] = set()
         self._revealed_cells: Set[Tuple[int, int]] = set()
         self._flags_placed: Set[Tuple[int, int]] = set()
+        self._rewarded_flags: Set[Tuple[int, int]] = set()
         self._mine_counts: List[List[int]] = [
             [0 for _ in range(width)] for _ in range(height)
         ]
@@ -102,6 +103,7 @@ class MinesweeperEnvironment(
         # Reset internal game state
         self._revealed_cells.clear()
         self._flags_placed.clear()
+        self._rewarded_flags.clear()
         self._game_status = GameStatus.ONGOING
 
         # Place mines randomly
@@ -249,7 +251,11 @@ class MinesweeperEnvironment(
             return 0.0, None
 
         self._flags_placed.add((row, col))
-        if (row, col) in self._mine_positions:
+        if (row, col) in self._mine_positions and (
+            row,
+            col,
+        ) not in self._rewarded_flags:
+            self._rewarded_flags.add((row, col))
             return 0.5, None
         return 0.0, None
 

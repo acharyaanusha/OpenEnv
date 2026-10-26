@@ -80,7 +80,7 @@ cd envs/minesweeper_env/server
 ### Rewards
 
 - Revealing a safe cell: +1.0
-- Placing a flag on a mine: +0.5
+- Placing a flag on a mine: +0.5 once per mine per episode. Removing or replacing a previously rewarded flag gives 0; reset restores bonus eligibility.
 - Revealing a mine (game over): -10.0
 - Revealing an already revealed cell: -0.05
 - Invalid action: -0.1
